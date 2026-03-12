@@ -154,6 +154,17 @@ function printEvents(events: { account: string; event: any }[]) {
       ? `  ${accountColor(account, accounts)}${account}${c.reset}`
       : "";
     console.log(`    ${c.dim}${time}${c.reset}  ${title}${acctTag}`);
+
+    // Show other attendees (exclude self)
+    const attendees = (event.attendees || []).filter(
+      (a: any) => !a.self && !a.resource
+    );
+    if (attendees.length > 0) {
+      for (const a of attendees) {
+        const name = a.displayName ? `${a.displayName} ` : "";
+        console.log(`           ${c.dim}${name}<${a.email}>${c.reset}`);
+      }
+    }
   }
   console.log();
 }
