@@ -10,7 +10,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "description": "CLI tool for Google Calendar",
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
