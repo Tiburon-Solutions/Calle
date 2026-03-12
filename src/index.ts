@@ -173,6 +173,15 @@ function printEvents(events: { account: string; event: any }[]) {
   console.log();
 }
 
+// Normalize lowercase flags to uppercase equivalents
+const FLAG_MAP: Record<string, string> = {
+  "-t": "-T",
+  "-d": "-D",
+  "-l": "-L",
+  "-c": "-C",
+};
+const argv = process.argv.map((arg) => FLAG_MAP[arg] ?? arg);
+
 program
   .option("-A, --add <title>", "Add a calendar event with the given title")
   .option("-T, --time <time>", "Time for the event (e.g. 14:00)")
@@ -324,4 +333,4 @@ program
     console.log(`  Link: ${event.htmlLink}`);
   });
 
-program.parse();
+program.parse(argv);
