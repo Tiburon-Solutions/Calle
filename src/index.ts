@@ -301,6 +301,25 @@ program
     }
 
     const parsed = chrono.parseDate(dateStr, new Date(), { forwardDate: true });
+
+    // If parsing fails and no explicit -A flag, treat everything as a task title
+    if (!parsed && !opts.add) {
+      const taskTitle = [title, ...datetime].filter(Boolean).join(" ");
+      let account = opts.account || getDefaultAccount();
+      if (!account) {
+        const accounts = getAccountNames();
+        if (accounts.length === 0) {
+          console.error("No accounts configured. Add one with:\n  calle --account <name>");
+          process.exit(1);
+        }
+        account = accounts[0];
+      }
+      const auth = await getAuthClient(account);
+      const task = await addTask(auth, taskTitle);
+      console.log(`${c.dim}☐${c.reset}  Task created: ${task.title} ${c.dim}[${account}]${c.reset}`);
+      return;
+    }
+
     if (!parsed) {
       console.error(`Error: Could not parse date/time "${dateStr}"`);
       process.exit(1);
