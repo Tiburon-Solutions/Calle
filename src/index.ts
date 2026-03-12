@@ -4,7 +4,7 @@ import { program } from "commander";
 import * as chrono from "chrono-node";
 import { getAuthClient, getAllAuthClients, getAccountNames, getDefaultAccount, setDefaultAccount } from "./auth.js";
 import { addEvent, listEvents } from "./calendar.js";
-import { addTask, listTasks } from "./tasks.js";
+import { addTask, listTasks, completeTask } from "./tasks.js";
 
 program
   .name("calle")
@@ -178,6 +178,7 @@ program
   .option("-T, --time <time>", "Time for the event (e.g. 14:00)")
   .option("-D, --duration <minutes>", "Duration in minutes (default: 60)", "60")
   .option("-L, --list", "List events for a given period")
+  .option("-C, --complete <query>", "Complete a task matching the query")
   .option("-a, --account <name>", "Account to use (e.g. tiburon.se)")
   .option("--default <name>", "Set the default account for adding events")
   .argument("[title]", "Event title (used when no -A flag)")
@@ -193,6 +194,20 @@ program
       setDefaultAccount(opts.default);
       console.log(`Default account set to "${opts.default}"`);
       return;
+    }
+
+    // Complete a task
+    if (opts.complete) {
+      const clients = await getAllAuthClients();
+      for (const { account, auth } of clients) {
+        const result = await completeTask(auth, opts.complete);
+        if (result) {
+          console.log(`${c.dim}☑${c.reset}  ${result.title} ${c.dim}[${account}]${c.reset}`);
+          return;
+        }
+      }
+      console.error(`No task matching "${opts.complete}" found.`);
+      process.exit(1);
     }
 
     // Add a new account
