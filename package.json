@@ -1,0 +1,21 @@
+{
+  "name": "calle",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "calle": "./src/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "CLI tool for Google Calendar",
+  "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
+    "chrono-node": "^2.9.0",
+    "commander": "^14.0.3",
+    "googleapis": "^171.4.0"
+  }
+}
