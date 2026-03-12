@@ -2,7 +2,7 @@
 
 import { program } from "commander";
 import * as chrono from "chrono-node";
-import { getAuthClient } from "./auth.js";
+import { getAuthClient, getAllAuthClients, getAccountNames } from "./auth.js";
 import { addEvent, listEvents } from "./calendar.js";
 
 program
@@ -68,12 +68,94 @@ function parseListRange(args: string[]): { timeMin: Date; timeMax: Date } {
   process.exit(1);
 }
 
-function formatEventTime(event: any): string {
+const c = {
+  reset: "\x1b[0m",
+  dim: "\x1b[2m",
+  bold: "\x1b[1m",
+  cyan: "\x1b[36m",
+  yellow: "\x1b[33m",
+  green: "\x1b[32m",
+  magenta: "\x1b[35m",
+  white: "\x1b[37m",
+};
+
+// Assign a consistent color to each account
+const ACCOUNT_COLORS = [c.cyan, c.magenta, c.green, c.yellow];
+function accountColor(account: string, accounts: string[]): string {
+  const idx = accounts.indexOf(account);
+  return ACCOUNT_COLORS[idx % ACCOUNT_COLORS.length];
+}
+
+function formatDate(event: any): string {
   if (event.start?.dateTime) {
-    return new Date(event.start.dateTime).toLocaleString("sv-SE");
+    const d = new Date(event.start.dateTime);
+    const day = d.toLocaleDateString("sv-SE", { weekday: "short" });
+    const date = d.toLocaleDateString("sv-SE");
+    return `${day} ${date}`;
   }
-  // All-day event
   return event.start?.date ?? "unknown";
+}
+
+function formatTime(event: any): string {
+  if (event.start?.dateTime) {
+    return new Date(event.start.dateTime).toLocaleTimeString("sv-SE", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return "heldag";
+}
+
+async function listAllEvents(timeMin: Date, timeMax: Date) {
+  const clients = await getAllAuthClients();
+  const allEvents: { account: string; event: any }[] = [];
+
+  for (const { account, auth } of clients) {
+    const events = await listEvents(auth, timeMin, timeMax);
+    for (const event of events) {
+      allEvents.push({ account, event });
+    }
+  }
+
+  // Sort all events by start time
+  allEvents.sort((a, b) => {
+    const aTime = a.event.start?.dateTime || a.event.start?.date || "";
+    const bTime = b.event.start?.dateTime || b.event.start?.date || "";
+    return aTime.localeCompare(bTime);
+  });
+
+  return allEvents;
+}
+
+function printEvents(events: { account: string; event: any }[]) {
+  if (events.length === 0) {
+    console.log(`${c.dim}No events found.${c.reset}`);
+    return;
+  }
+
+  const accounts = [...new Set(events.map((e) => e.account))];
+  const multipleAccounts = accounts.length > 1;
+
+  let lastDate = "";
+
+  for (const { account, event } of events) {
+    const date = formatDate(event);
+    const time = formatTime(event);
+    const title = event.summary ?? "(no title)";
+
+    // Print date header when day changes
+    if (date !== lastDate) {
+      if (lastDate) console.log();
+      console.log(`${c.bold}${c.white}  ${date}${c.reset}`);
+      lastDate = date;
+    }
+
+    const acctTag = multipleAccounts
+      ? `  ${accountColor(account, accounts)}${account}${c.reset}`
+      : "";
+    console.log(`    ${c.dim}${time}${c.reset}  ${title}${acctTag}`);
+  }
+  console.log();
 }
 
 program
@@ -81,43 +163,42 @@ program
   .option("-T, --time <time>", "Time for the event (e.g. 14:00)")
   .option("-D, --duration <minutes>", "Duration in minutes (default: 60)", "60")
   .option("-L, --list", "List events for a given period")
+  .option("-a, --account <name>", "Account to use (e.g. tiburon.se)")
   .argument("[title]", "Event title (used when no -A flag)")
   .argument("[datetime...]", "Date/time for the event (e.g. 14:00 tomorrow)")
   .action(async (title: string | undefined, datetime: string[], opts: Record<string, string>) => {
+    // Add a new account
+    if (opts.account && !opts.add && !opts.list && !title) {
+      await getAuthClient(opts.account);
+      console.log(`Account "${opts.account}" authenticated.`);
+      return;
+    }
+
+    // List events
     if (opts.list !== undefined) {
       const allArgs = [title, ...datetime].filter(Boolean) as string[];
       if (allArgs.length === 0) allArgs.push("week");
 
       const { timeMin, timeMax } = parseListRange(allArgs);
-      const auth = await getAuthClient();
-      const events = await listEvents(auth, timeMin, timeMax);
 
-      if (events.length === 0) {
-        console.log("No events found.");
-        return;
-      }
-
-      for (const event of events) {
-        console.log(`  ${formatEventTime(event)}  ${event.summary ?? "(no title)"}`);
+      if (opts.account) {
+        const auth = await getAuthClient(opts.account);
+        const events = await listEvents(auth, timeMin, timeMax);
+        printEvents(events.map((e) => ({ account: opts.account, event: e })));
+      } else {
+        const events = await listAllEvents(timeMin, timeMax);
+        printEvents(events);
       }
       return;
     }
 
+    // Add event
     const summary = opts.add || title;
     if (!summary) {
       // No flags and no arguments — default to listing this week
       const { timeMin, timeMax } = parseListRange(["week"]);
-      const auth = await getAuthClient();
-      const events = await listEvents(auth, timeMin, timeMax);
-
-      if (events.length === 0) {
-        console.log("No events found.");
-        return;
-      }
-
-      for (const event of events) {
-        console.log(`  ${formatEventTime(event)}  ${event.summary ?? "(no title)"}`);
-      }
+      const events = await listAllEvents(timeMin, timeMax);
+      printEvents(events);
       return;
     }
 
@@ -136,14 +217,29 @@ program
       process.exit(1);
     }
 
-    const auth = await getAuthClient();
+    // When adding, use specific account or first account
+    let account = opts.account;
+    if (!account) {
+      const accounts = getAccountNames();
+      if (accounts.length === 0) {
+        console.error("No accounts configured. Add one with:\n  calle --account <name>");
+        process.exit(1);
+      }
+      if (accounts.length > 1) {
+        console.error(`Multiple accounts found. Specify one with -a:\n  ${accounts.map((a) => `-a ${a}`).join("\n  ")}`);
+        process.exit(1);
+      }
+      account = accounts[0];
+    }
+
+    const auth = await getAuthClient(account);
     const event = await addEvent(auth, {
       summary: summary!,
       startTime: parsed,
       duration: parseInt(opts.duration, 10),
     });
 
-    console.log(`Event created: ${event.summary}`);
+    console.log(`Event created: ${event.summary} [${account}]`);
     console.log(`  When: ${new Date(event.start?.dateTime!).toLocaleString("sv-SE")}`);
     console.log(`  Link: ${event.htmlLink}`);
   });
