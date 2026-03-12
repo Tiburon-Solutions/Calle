@@ -9,7 +9,11 @@ import os from "node:os";
 const CONFIG_DIR = path.join(os.homedir(), ".config", "calle");
 const ACCOUNTS_DIR = path.join(CONFIG_DIR, "accounts");
 const CREDENTIALS_PATH = path.join(CONFIG_DIR, "credentials.json");
-const SCOPES = ["https://www.googleapis.com/auth/calendar"];
+const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
+const SCOPES = [
+  "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/tasks",
+];
 
 function ensureConfigDir(): void {
   fs.mkdirSync(ACCOUNTS_DIR, { recursive: true });
@@ -85,6 +89,25 @@ export async function getAuthClient(account: string) {
   }
 
   return newClient;
+}
+
+export function getDefaultAccount(): string | null {
+  try {
+    const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+    return config.defaultAccount || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setDefaultAccount(account: string): void {
+  ensureConfigDir();
+  let config: Record<string, any> = {};
+  try {
+    config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  } catch {}
+  config.defaultAccount = account;
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
 export async function getAllAuthClients(): Promise<{ account: string; auth: any }[]> {

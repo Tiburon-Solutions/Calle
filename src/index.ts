@@ -2,8 +2,9 @@
 
 import { program } from "commander";
 import * as chrono from "chrono-node";
-import { getAuthClient, getAllAuthClients, getAccountNames } from "./auth.js";
+import { getAuthClient, getAllAuthClients, getAccountNames, getDefaultAccount, setDefaultAccount } from "./auth.js";
 import { addEvent, listEvents } from "./calendar.js";
+import { addTask, listTasks } from "./tasks.js";
 
 program
   .name("calle")
@@ -178,9 +179,22 @@ program
   .option("-D, --duration <minutes>", "Duration in minutes (default: 60)", "60")
   .option("-L, --list", "List events for a given period")
   .option("-a, --account <name>", "Account to use (e.g. tiburon.se)")
+  .option("--default <name>", "Set the default account for adding events")
   .argument("[title]", "Event title (used when no -A flag)")
   .argument("[datetime...]", "Date/time for the event (e.g. 14:00 tomorrow)")
   .action(async (title: string | undefined, datetime: string[], opts: Record<string, string>) => {
+    // Set default account
+    if (opts.default) {
+      const accounts = getAccountNames();
+      if (!accounts.includes(opts.default)) {
+        console.error(`Account "${opts.default}" not found. Available: ${accounts.join(", ")}`);
+        process.exit(1);
+      }
+      setDefaultAccount(opts.default);
+      console.log(`Default account set to "${opts.default}"`);
+      return;
+    }
+
     // Add a new account
     if (opts.account && !opts.add && !opts.list && !title) {
       await getAuthClient(opts.account);
@@ -188,10 +202,30 @@ program
       return;
     }
 
-    // List events
+    // List events or tasks
     if (opts.list !== undefined) {
       const allArgs = [title, ...datetime].filter(Boolean) as string[];
       if (allArgs.length === 0) allArgs.push("week");
+
+      // List tasks
+      if (allArgs[0].toLowerCase() === "tasks") {
+        const clients = await getAllAuthClients();
+        const multipleAccounts = clients.length > 1;
+
+        for (const { account, auth } of clients) {
+          const tasks = await listTasks(auth);
+          if (tasks.length === 0) continue;
+
+          if (multipleAccounts) {
+            console.log(`${c.bold}${c.white}${account}${c.reset}`);
+          }
+          for (const task of tasks) {
+            console.log(`  ${c.dim}☐${c.reset}  ${task.title}`);
+          }
+          if (multipleAccounts) console.log();
+        }
+        return;
+      }
 
       const { timeMin, timeMax } = parseListRange(allArgs);
 
@@ -216,9 +250,26 @@ program
       return;
     }
 
+    // Single argument with no time/date → create a task
     const dateStr = opts.add
       ? [opts.time, title, ...datetime].filter(Boolean).join(" ")
       : [opts.time, ...datetime].filter(Boolean).join(" ");
+
+    if (!dateStr && !opts.add) {
+      let account = opts.account || getDefaultAccount();
+      if (!account) {
+        const accounts = getAccountNames();
+        if (accounts.length === 0) {
+          console.error("No accounts configured. Add one with:\n  calle --account <name>");
+          process.exit(1);
+        }
+        account = accounts[0];
+      }
+      const auth = await getAuthClient(account);
+      const task = await addTask(auth, summary!);
+      console.log(`${c.dim}☐${c.reset}  Task created: ${task.title} ${c.dim}[${account}]${c.reset}`);
+      return;
+    }
 
     if (!dateStr) {
       console.error("Error: Provide a time (e.g. 14:00 tomorrow)");
@@ -231,8 +282,8 @@ program
       process.exit(1);
     }
 
-    // When adding, use specific account or first account
-    let account = opts.account;
+    // When adding, use specific account, default account, or only account
+    let account = opts.account || getDefaultAccount();
     if (!account) {
       const accounts = getAccountNames();
       if (accounts.length === 0) {
@@ -240,7 +291,7 @@ program
         process.exit(1);
       }
       if (accounts.length > 1) {
-        console.error(`Multiple accounts found. Specify one with -a:\n  ${accounts.map((a) => `-a ${a}`).join("\n  ")}`);
+        console.error(`Multiple accounts found. Set a default with:\n  calle --default <name>\n\nAvailable: ${accounts.join(", ")}`);
         process.exit(1);
       }
       account = accounts[0];
