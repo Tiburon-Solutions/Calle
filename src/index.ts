@@ -89,9 +89,10 @@ function accountColor(account: string, accounts: string[]): string {
 function formatDate(event: any): string {
   if (event.start?.dateTime) {
     const d = new Date(event.start.dateTime);
-    const day = d.toLocaleDateString("sv-SE", { weekday: "short" });
+    const day = d.toLocaleDateString("sv-SE", { weekday: "long" });
+    const dayCapitalized = day.charAt(0).toUpperCase() + day.slice(1);
     const date = d.toLocaleDateString("sv-SE");
-    return `${day} ${date}`;
+    return `${dayCapitalized} ${date}`;
   }
   return event.start?.date ?? "unknown";
 }
@@ -103,7 +104,7 @@ function formatTime(event: any): string {
   if (event.start?.dateTime) {
     const start = fmt(new Date(event.start.dateTime));
     const end = event.end?.dateTime ? fmt(new Date(event.end.dateTime)) : "";
-    return end ? `${start}–${end}` : start;
+    return end ? `${start} – ${end}` : start;
   }
   return "heldag";
 }
@@ -148,14 +149,14 @@ function printEvents(events: { account: string; event: any }[]) {
     // Print date header when day changes
     if (date !== lastDate) {
       if (lastDate) console.log();
-      console.log(`${c.bold}${c.white}  ${date}${c.reset}`);
+      console.log(`${c.bold}${c.white}${date}${c.reset}`);
       lastDate = date;
     }
 
     const acctTag = multipleAccounts
       ? `  ${accountColor(account, accounts)}${account}${c.reset}`
       : "";
-    console.log(`    ${c.dim}${time}${c.reset}  ${title}${acctTag}`);
+    console.log(`  ${c.dim}${time}${c.reset}  ${title}${acctTag}`);
 
     // Show other attendees (exclude self)
     const attendees = (event.attendees || []).filter(
@@ -164,7 +165,7 @@ function printEvents(events: { account: string; event: any }[]) {
     if (attendees.length > 0) {
       for (const a of attendees) {
         const name = a.displayName ? `${a.displayName} ` : "";
-        console.log(`                 ${c.dim}${name}<${a.email}>${c.reset}`);
+        console.log(`                   ${c.dim}${name}<${a.email}>${c.reset}`);
       }
     }
   }
