@@ -97,11 +97,13 @@ function formatDate(event: any): string {
 }
 
 function formatTime(event: any): string {
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+
   if (event.start?.dateTime) {
-    return new Date(event.start.dateTime).toLocaleTimeString("sv-SE", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const start = fmt(new Date(event.start.dateTime));
+    const end = event.end?.dateTime ? fmt(new Date(event.end.dateTime)) : "";
+    return end ? `${start}–${end}` : start;
   }
   return "heldag";
 }
@@ -162,7 +164,7 @@ function printEvents(events: { account: string; event: any }[]) {
     if (attendees.length > 0) {
       for (const a of attendees) {
         const name = a.displayName ? `${a.displayName} ` : "";
-        console.log(`           ${c.dim}${name}<${a.email}>${c.reset}`);
+        console.log(`                 ${c.dim}${name}<${a.email}>${c.reset}`);
       }
     }
   }
