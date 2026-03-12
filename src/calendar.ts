@@ -28,3 +28,21 @@ export async function addEvent(
 
   return res.data;
 }
+
+export async function listEvents(
+  auth: any,
+  timeMin: Date,
+  timeMax: Date
+) {
+  const calendar = google.calendar({ version: "v3", auth: auth as any });
+
+  const res = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: timeMin.toISOString(),
+    timeMax: timeMax.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+  });
+
+  return res.data.items || [];
+}
