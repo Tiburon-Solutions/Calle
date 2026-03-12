@@ -1,3 +1,5 @@
+#!/usr/bin/env bun
+
 import { google } from "googleapis";
 import { authenticate } from "@google-cloud/local-auth";
 import fs from "node:fs";
@@ -9,7 +11,7 @@ const TOKEN_PATH = path.join(CONFIG_DIR, "token.json");
 const CREDENTIALS_PATH = path.join(CONFIG_DIR, "credentials.json");
 const SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
-function ensureConfigDir() {
+function ensureConfigDir(): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
 }
 
@@ -23,7 +25,7 @@ function loadSavedToken() {
   }
 }
 
-function saveToken(client) {
+function saveToken(client: Awaited<ReturnType<typeof authenticate>>): void {
   const keys = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
   const key = keys.installed || keys.web;
   const payload = {
@@ -50,17 +52,17 @@ export async function getAuthClient() {
     process.exit(1);
   }
 
-  let client = loadSavedToken();
+  const client = loadSavedToken();
   if (client) return client;
 
-  client = await authenticate({
+  const newClient = await authenticate({
     scopes: SCOPES,
     keyfilePath: CREDENTIALS_PATH,
   });
 
-  if (client.credentials) {
-    saveToken(client);
+  if (newClient.credentials) {
+    saveToken(newClient);
   }
 
-  return client;
+  return newClient;
 }

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { program } from "commander";
 import * as chrono from "chrono-node";
@@ -15,7 +15,7 @@ program
   .option("-T, --time <time>", "Time for the event (e.g. 14:00)")
   .option("-D, --duration <minutes>", "Duration in minutes (default: 60)", "60")
   .argument("[date]", "Date for the event (e.g. tomorrow, next friday)")
-  .action(async (date, opts) => {
+  .action(async (date: string | undefined, opts: Record<string, string>) => {
     if (!opts.add) {
       program.help();
     }
@@ -40,7 +40,7 @@ program
     });
 
     console.log(`Event created: ${event.summary}`);
-    console.log(`  When: ${new Date(event.start.dateTime).toLocaleString()}`);
+    console.log(`  When: ${new Date(event.start?.dateTime!).toLocaleString()}`);
     console.log(`  Link: ${event.htmlLink}`);
   });
 
