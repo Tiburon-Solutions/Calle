@@ -14,15 +14,20 @@ program
   .option("-A, --add <title>", "Add a calendar event with the given title")
   .option("-T, --time <time>", "Time for the event (e.g. 14:00)")
   .option("-D, --duration <minutes>", "Duration in minutes (default: 60)", "60")
-  .argument("[date]", "Date for the event (e.g. tomorrow, next friday)")
-  .action(async (date: string | undefined, opts: Record<string, string>) => {
-    if (!opts.add) {
+  .argument("[title]", "Event title (used when no -A flag)")
+  .argument("[datetime...]", "Date/time for the event (e.g. 14:00 tomorrow)")
+  .action(async (title: string | undefined, datetime: string[], opts: Record<string, string>) => {
+    const summary = opts.add || title;
+    if (!summary) {
       program.help();
     }
 
-    const dateStr = [opts.time, date].filter(Boolean).join(" ");
+    const dateStr = opts.add
+      ? [opts.time, title, ...datetime].filter(Boolean).join(" ")
+      : [opts.time, ...datetime].filter(Boolean).join(" ");
+
     if (!dateStr) {
-      console.error("Error: Provide a time (-T) and/or date (e.g. tomorrow)");
+      console.error("Error: Provide a time (e.g. 14:00 tomorrow)");
       process.exit(1);
     }
 
@@ -34,7 +39,7 @@ program
 
     const auth = await getAuthClient();
     const event = await addEvent(auth, {
-      summary: opts.add,
+      summary: summary!,
       startTime: parsed,
       duration: parseInt(opts.duration, 10),
     });
