@@ -17,8 +17,8 @@ export async function addEvent(
 
   const event = {
     summary,
-    start: { dateTime: start.toISOString() },
-    end: { dateTime: end.toISOString() },
+    start: { dateTime: start.toISOString(), timeZone: "Europe/Stockholm" },
+    end: { dateTime: end.toISOString(), timeZone: "Europe/Stockholm" },
   };
 
   const res = await calendar.events.insert({

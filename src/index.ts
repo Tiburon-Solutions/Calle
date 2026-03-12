@@ -40,7 +40,7 @@ program
     });
 
     console.log(`Event created: ${event.summary}`);
-    console.log(`  When: ${new Date(event.start?.dateTime!).toLocaleString()}`);
+    console.log(`  When: ${new Date(event.start?.dateTime!).toLocaleString("sv-SE")}`);
     console.log(`  Link: ${event.htmlLink}`);
   });
 
